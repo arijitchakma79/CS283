@@ -313,22 +313,30 @@ int main(int argc, char *argv[]){
 
     switch (opt) {
         case 'c':
-        rc = count_words(buff, BUFFER_SZ, user_str_len);
-        if (rc < 0) {
-            printf("Error counting words, rc = %d", rc);
+            rc = count_words(buff, BUFFER_SZ, user_str_len);
+            if (rc < 0) {
+                printf("Error counting words, rc = %d", rc);
+                free(buff);
+                exit(3);
+            }
+            printf("Word Count: %d\n", rc);
+            print_buff(buff, BUFFER_SZ);
             free(buff);
-            exit(3);
-        }
-        printf("Word Count: %d\n", rc);  // Keep this line
-        print_buff(buff, BUFFER_SZ);     
-        break;
+            exit(0);
+            break;
 
         case 'r':
             reverse_string(buff, BUFFER_SZ, user_str_len);
+            print_buff(buff, BUFFER_SZ);
+            free(buff);
+            exit(0);
             break;
 
         case 'w':
             word_print(buff, BUFFER_SZ, user_str_len);
+            print_buff(buff, BUFFER_SZ);
+            free(buff);
+            exit(0);
             break;
 
         case 'x':
@@ -339,7 +347,11 @@ int main(int argc, char *argv[]){
                 exit(1);
             }
             replace_string(buff, BUFFER_SZ, user_str_len, argv[3], argv[4]);
+            print_buff(buff, BUFFER_SZ);
+            free(buff);
+            exit(0);
             break;
+
         default:
             usage(argv[0]);
             free(buff);
