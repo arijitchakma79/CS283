@@ -20,17 +20,7 @@ void word_print(char *, int, int);
 
 int setup_buff(char *buff, char *user_str, int len) {
     if (user_str == NULL || *user_str == '\0') {
-        return -2;  // Invalid input string
-    }
-
-    char *temp = user_str;
-    int str_length = 0;
-    while (*temp != '\0') {
-        str_length++;
-        temp++;
-    }
-    if (str_length > len - 1) {
-        return -1;  // String too long
+        return -2;  // Empty input
     }
 
     char *src = user_str;
@@ -42,33 +32,30 @@ int setup_buff(char *buff, char *user_str, int len) {
     while (*src != '\0') {
         if (*src == ' ' || *src == '\t') {
             if (!space_flag) {
+                if (count >= len) return -1; // Prevent overflow
                 *dest = ' ';
                 dest++;
                 count++;
                 space_flag = 1;
             }
         } else {
+            if (count >= len) return -1;
             *dest = *src;
             dest++;
             count++;
             space_flag = 0;
-            actual_length = count; 
-        }
-
-        if (count >= len) {
-            return -1;
+            actual_length = count;
         }
         src++;
     }
 
-    // Fill remainder with dots
     while (count < len) {
         *dest = '.';
         dest++;
         count++;
     }
 
-    return actual_length;  
+    return actual_length;
 }
 
 void print_buff(char *buff, int len){
@@ -90,19 +77,20 @@ int count_words(char *buff, int len, int str_len) {
     int in_word = 0;
 
     for (int i = 0; i < str_len; i++) {
-        if (*ptr != ' ' && *ptr != '.') {  // Found a valid character
+        if (*ptr != ' ' && *ptr != '.') {  // Valid character
             if (!in_word) { 
-                count++;  // Start of a new word
+                count++;  
                 in_word = 1;
             }
         } else {
-            in_word = 0;  // Word ended
+            in_word = 0;  
         }
         ptr++;
     }
 
     return count; 
 }
+
 
 
 //ADD OTHER HELPER FUNCTIONS HERE FOR OTHER REQUIRED PROGRAM OPTIONS
@@ -158,94 +146,84 @@ void word_print(char *buff, int len, int str_len) {
 }
 
 void replace_string(char *buff, int len, int str_len, char *find, char *replace) {
-    // First calculate lengths of find and replace strings without strlen
     char *ptr;
-    int find_len = 0;
-    int replace_len = 0;
+    int find_len = 0, replace_len = 0;
     
-    // Get find length
+    // Calculate find length
     ptr = find;
     while (*ptr != '\0') {
         find_len++;
         ptr++;
     }
     
-    // Get replace length
+    // Calculate replace length
     ptr = replace;
     while (*ptr != '\0') {
         replace_len++;
         ptr++;
     }
     
-    // Find the substring in buffer
-    char *start = buff;
-    char *end = buff + str_len;
+    // Find substring in buffer
     char *match_start = NULL;
-    int found = 0;
+    ptr = buff;
     
-    while (start < end && !found) {
-        // Try to match the find string at current position
-        char *curr = start;
-        char *find_ptr = find;
-        int matched = 1;
-        
-        while (*find_ptr != '\0' && curr < end) {
-            if (*curr != *find_ptr) {
-                matched = 0;
+    while (ptr < buff + str_len) {
+        if (*ptr == *find) {
+            char *temp_find = find;
+            char *check = ptr;
+            int matched = 1;
+            
+            while (*temp_find != '\0' && check < buff + str_len) {
+                if (*check != *temp_find) {
+                    matched = 0;
+                    break;
+                }
+                temp_find++;
+                check++;
+            }
+            
+            if (matched) {
+                match_start = ptr;
                 break;
             }
-            curr++;
-            find_ptr++;
         }
-        
-        if (matched && *find_ptr == '\0') {
-            match_start = start;
-            found = 1;
-        } else {
-            start++;
-        }
+        ptr++;
     }
-    
-    if (!found) {
-        printf("error: Search string not found\n");
+
+    if (!match_start) {
+        printf("Error: Search string not found\n");
         return;
     }
-    
-    // Calculate new string length after replacement
+
     int new_len = str_len - find_len + replace_len;
-    
-    // Check if new string would exceed buffer
+
     if (new_len > len) {
-        printf("error: Replacement would exceed buffer size\n");
+        printf("Error: Replacement would exceed buffer size\n");
         return;
     }
+
+    // Move characters manually
+    char *src = match_start + find_len;
+    char *dest = match_start + replace_len;
+    int shift = replace_len - find_len;
     
-    // Shift the rest of the string if replace_len != find_len
-    if (replace_len != find_len) {
-        char *src = match_start + find_len;
-        char *dest = match_start + replace_len;
+    if (shift < 0) { // Shift left
+        while (src < buff + str_len) {
+            *dest = *src;
+            dest++;
+            src++;
+        }
+    } else if (shift > 0) { // Shift right
+        char *end = buff + str_len - 1;
+        char *new_end = buff + new_len - 1;
         
-        if (replace_len < find_len) {
-            // Shift left
-            while (src < buff + str_len) {
-                *dest = *src;
-                dest++;
-                src++;
-            }
-        } else {
-            // Shift right
-            // Move from end to avoid overwriting
-            src = buff + str_len - 1;
-            dest = buff + str_len + (replace_len - find_len) - 1;
-            
-            while (src >= match_start + find_len) {
-                *dest = *src;
-                dest--;
-                src--;
-            }
+        while (end >= src) {
+            *new_end = *end;
+            new_end--;
+            end--;
         }
     }
-    
+
     // Copy replacement string
     char *replace_ptr = replace;
     ptr = match_start;
@@ -254,15 +232,13 @@ void replace_string(char *buff, int len, int str_len, char *find, char *replace)
         ptr++;
         replace_ptr++;
     }
-    
+
     // Fill remainder with dots
-    ptr = buff + new_len;
     while (ptr < buff + len) {
         *ptr = '.';
         ptr++;
     }
-    
-    // Print the modified string
+
     printf("Modified String: ");
     for (int i = 0; i < new_len; i++) {
         putchar(*(buff + i));
@@ -362,7 +338,7 @@ int main(int argc, char *argv[]){
             break;
         case 'x':
             if (argc != 5) {
-                printf("error: -x requires exactly 2 additional arguments\n");
+                printf("Error: -x requires exactly 2 additional arguments\n");
                 printf("Usage: %s -x \"string\" \"find\" \"replace\"\n", argv[0]);
                 free(buff);
                 exit(1);
