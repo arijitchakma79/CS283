@@ -26,16 +26,20 @@ int setup_buff(char *buff, char *user_str, int len) {
     char *src = user_str;
     char *dest = buff;
     int count = 0;
-    int space_flag = 0;
+    int space_flag = 1;  // Start as 1 to handle leading spaces
     int actual_length = 0;
+
+    // Skip leading spaces
+    while (*src == ' ' || *src == '\t') src++;
 
     while (*src != '\0') {
         if (*src == ' ' || *src == '\t') {
-            if (!space_flag) {  // Only add a single space
+            if (!space_flag && *(src + 1) != '\0') {  // Add space only if not at end
                 if (count >= len) return -1;
                 *dest = ' ';
                 dest++;
                 count++;
+                actual_length = count;
                 space_flag = 1;
             }
         } else {
@@ -43,18 +47,13 @@ int setup_buff(char *buff, char *user_str, int len) {
             *dest = *src;
             dest++;
             count++;
-            space_flag = 0;
             actual_length = count;
+            space_flag = 0;
         }
         src++;
     }
 
-    // Remove trailing space
-    if (actual_length > 0 && buff[actual_length - 1] == ' ') {
-        actual_length--;
-    }
-
-    // Fill remaining buffer with dots
+    // Fill remainder with dots
     while (count < len) {
         *dest = '.';
         dest++;
@@ -63,7 +62,6 @@ int setup_buff(char *buff, char *user_str, int len) {
 
     return actual_length;
 }
-
 
 void print_buff(char *buff, int len) {
     printf("Buffer:  [");
@@ -118,8 +116,7 @@ void reverse_string(char *buff, int len, int str_len) {
 
 
 void word_print(char *buff, int len, int str_len) {
-    printf("Word Print\n");
-    printf("----------\n");
+    printf("Word Print\n----------\n");
 
     char *ptr = buff;
     int word_count = 1;
@@ -195,15 +192,15 @@ void replace_string(char *buff, int len, int str_len, char *find, char *replace)
     }
 
     if (!match_start) {
-        printf("Error: Search string not found\n");
-        return;
+        printf("error: Search string not found\n");
+        exit(3);  
     }
 
     int new_len = str_len - find_len + replace_len;
 
     if (new_len > len) {
-        printf("Error: Replacement would exceed buffer size\n");
-        return;
+        printf("error: Replacement would exceed buffer size\n");
+        exit(3);  
     }
 
     // Move characters manually
@@ -316,14 +313,15 @@ int main(int argc, char *argv[]){
 
     switch (opt) {
         case 'c':
-            rc = count_words(buff, BUFFER_SZ, user_str_len);
-            if (rc < 0) {
-                printf("Error counting words, rc = %d", rc);
-                free(buff);
-                exit(3);
-            }
-            printf("Word Count: %d\n", rc);
-            break;
+        rc = count_words(buff, BUFFER_SZ, user_str_len);
+        if (rc < 0) {
+            printf("Error counting words, rc = %d", rc);
+            free(buff);
+            exit(3);
+        }
+        printf("Word Count: %d\n", rc);  // Keep this line
+        print_buff(buff, BUFFER_SZ);     
+        break;
 
         case 'r':
             reverse_string(buff, BUFFER_SZ, user_str_len);
