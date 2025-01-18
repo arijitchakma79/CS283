@@ -20,7 +20,7 @@ void word_print(char *, int, int);
 
 int setup_buff(char *buff, char *user_str, int len) {
     if (user_str == NULL || *user_str == '\0') {
-        return -2;  // Empty input
+        return -2;
     }
 
     char *src = user_str;
@@ -31,8 +31,8 @@ int setup_buff(char *buff, char *user_str, int len) {
 
     while (*src != '\0') {
         if (*src == ' ' || *src == '\t') {
-            if (!space_flag) {
-                if (count >= len) return -1; // Prevent overflow
+            if (!space_flag) {  // Only add a single space
+                if (count >= len) return -1;
                 *dest = ' ';
                 dest++;
                 count++;
@@ -49,6 +49,12 @@ int setup_buff(char *buff, char *user_str, int len) {
         src++;
     }
 
+    // Remove trailing space
+    if (actual_length > 0 && buff[actual_length - 1] == ' ') {
+        actual_length--;
+    }
+
+    // Fill remaining buffer with dots
     while (count < len) {
         *dest = '.';
         dest++;
@@ -57,6 +63,7 @@ int setup_buff(char *buff, char *user_str, int len) {
 
     return actual_length;
 }
+
 
 void print_buff(char *buff, int len) {
     printf("Buffer:  [");
