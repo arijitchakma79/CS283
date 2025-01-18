@@ -58,12 +58,12 @@ int setup_buff(char *buff, char *user_str, int len) {
     return actual_length;
 }
 
-void print_buff(char *buff, int len){
-    printf("Buffer:  ");
-    for (int i=0; i<len; i++){
-        putchar(*(buff+i));
+void print_buff(char *buff, int len) {
+    printf("Buffer:  [");
+    for (int i = 0; i < len; i++) {
+        putchar(*(buff + i));
     }
-    putchar('\n');
+    printf("]\n");
 }
 
 void usage(char *exename){
@@ -107,11 +107,6 @@ void reverse_string(char *buff, int len, int str_len) {
         start++;
         end--;
     }
-    printf("Reversed String: ");
-    for (int i = 0; i < str_len; i++) {
-        putchar(*(buff + i));
-    }
-    putchar('\n');
 }
 
 
@@ -122,11 +117,13 @@ void word_print(char *buff, int len, int str_len) {
     char *ptr = buff;
     int word_count = 1;
     int char_count = 0;
+    int total_words = 0;
 
     while (ptr < buff + str_len) {
         if (*ptr != ' ' && *ptr != '.') {
             if (char_count == 0) {
                 printf("%d. ", word_count);
+                total_words++;
             }
             putchar(*ptr);
             char_count++;
@@ -140,11 +137,11 @@ void word_print(char *buff, int len, int str_len) {
         ptr++;
     }
 
-    if (char_count > 0) { // Last word case
+    if (char_count > 0) {
         printf(" (%d)\n", char_count);
     }
+    printf("\nNumber of words returned: %d\n", total_words);
 }
-
 void replace_string(char *buff, int len, int str_len, char *find, char *replace) {
     char *ptr;
     int find_len = 0, replace_len = 0;
@@ -238,12 +235,6 @@ void replace_string(char *buff, int len, int str_len, char *find, char *replace)
         *ptr = '.';
         ptr++;
     }
-
-    printf("Modified String: ");
-    for (int i = 0; i < new_len; i++) {
-        putchar(*(buff + i));
-    }
-    printf("\n");
 }
 
 
@@ -316,29 +307,31 @@ int main(int argc, char *argv[]){
         exit(2);
     }
 
-    switch (opt){
+    switch (opt) {
         case 'c':
-            rc = count_words(buff, BUFFER_SZ, user_str_len);  //you need to implement
-            if (rc < 0){
+            rc = count_words(buff, BUFFER_SZ, user_str_len);
+            if (rc < 0) {
                 printf("Error counting words, rc = %d", rc);
                 free(buff);
                 exit(3);
             }
             printf("Word Count: %d\n", rc);
+            print_buff(buff, BUFFER_SZ);
             break;
 
-        //TODO:  #5 Implement the other cases for 'r' and 'w' by extending
-        //       the case statement options
         case 'r':
             reverse_string(buff, BUFFER_SZ, user_str_len);
+            print_buff(buff, BUFFER_SZ); 
             break;
 
         case 'w':
             word_print(buff, BUFFER_SZ, user_str_len);
+            print_buff(buff, BUFFER_SZ);
             break;
+
         case 'x':
             if (argc != 5) {
-                printf("Error: -x requires exactly 2 additional arguments\n");
+                printf("error: -x requires exactly 2 additional arguments\n");
                 printf("Usage: %s -x \"string\" \"find\" \"replace\"\n", argv[0]);
                 free(buff);
                 exit(1);
@@ -346,10 +339,9 @@ int main(int argc, char *argv[]){
             replace_string(buff, BUFFER_SZ, user_str_len, argv[3], argv[4]);
             break;
         default:
-        printf("error: Invalid option\n");
-        usage(argv[0]);
-        free(buff);
-        exit(1);
+            usage(argv[0]);
+            free(buff);
+            exit(1);
     }
 
     //TODO:  #6 Dont forget to free your buffer before exiting
