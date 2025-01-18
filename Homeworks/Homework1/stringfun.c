@@ -316,17 +316,14 @@ int main(int argc, char *argv[]){
                 exit(3);
             }
             printf("Word Count: %d\n", rc);
-            print_buff(buff, BUFFER_SZ);
             break;
 
         case 'r':
             reverse_string(buff, BUFFER_SZ, user_str_len);
-            print_buff(buff, BUFFER_SZ); 
             break;
 
         case 'w':
             word_print(buff, BUFFER_SZ, user_str_len);
-            print_buff(buff, BUFFER_SZ);
             break;
 
         case 'x':
