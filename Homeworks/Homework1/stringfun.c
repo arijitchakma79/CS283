@@ -39,7 +39,7 @@ int setup_buff(char *buff, char *user_str, int len) {
 
     // Skips leading spaces
     while (*src == ' ' || *src == '\t') {
-        src++
+        src++;
     };
 
     while (*src != '\0') {
