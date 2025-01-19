@@ -2,8 +2,7 @@
 /*
 Name: Arijit Chakma
 Homework 1: CS283
-Purpose: 
-
+Purpose: Text Line Processor utiltiy using C. 
 */
 
 #include <stdio.h>
@@ -19,6 +18,8 @@ void print_buff(char *, int);
 int  setup_buff(char *, char *, int);
 
 //prototypes for functions to handle required functionality
+
+
 int  count_words(char *, int, int);
 //add additional prototypes here
 void reverse_string(char *, int, int);
@@ -40,11 +41,14 @@ int setup_buff(char *buff, char *user_str, int len) {
     // Skips leading spaces
     while (*src == ' ' || *src == '\t') {
         src++;
-    };
+    }
 
     while (*src != '\0') {
         if (*src == ' ' || *src == '\t') {
-            if (!space_flag && *(src + 1) != '\0') {  // Adds space only if not at end
+            // Only adds space if next character is not space/tab/null
+            char *next = src + 1;
+            while (*next == ' ' || *next == '\t') next++;
+            if (!space_flag && *next != '\0') {
                 if (count >= len) return -1;
                 *dest = ' ';
                 dest++;
@@ -72,7 +76,6 @@ int setup_buff(char *buff, char *user_str, int len) {
 
     return actual_length;
 }
-
 
 void print_buff(char *buff, int len) {
     printf("Buffer:  [");
@@ -148,7 +151,7 @@ void word_print(char *buff, int len, int str_len) {
             char_count++;
         } else {
             if (char_count > 0) {
-                printf(" (%d)\n", char_count);
+                printf("(%d)\n", char_count);  // Removes space before parenthesis
                 word_count++;
                 char_count = 0;
             }
@@ -157,9 +160,10 @@ void word_print(char *buff, int len, int str_len) {
     }
 
     if (char_count > 0) {
-        printf(" (%d)\n", char_count);
+        printf("(%d)\n", char_count);  // Removes space before parenthesis
     }
-    printf("\nNumber of words returned: %d\n", total_words);
+    printf("\n");  
+    printf("Number of words returned: %d\n", total_words);
 }
 
 
