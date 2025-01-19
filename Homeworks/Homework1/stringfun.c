@@ -53,7 +53,7 @@ int setup_buff(char *buff, char *user_str, int len) {
         src++;
     }
 
-    // Fill remainder with dots
+    // Fill remainder with dots (ensuring full BUFFER_SZ)
     while (count < len) {
         *dest = '.';
         dest++;
@@ -62,6 +62,7 @@ int setup_buff(char *buff, char *user_str, int len) {
 
     return actual_length;
 }
+
 
 void print_buff(char *buff, int len) {
     printf("Buffer:  [");
