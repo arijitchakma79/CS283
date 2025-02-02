@@ -263,7 +263,7 @@ int print_db(int fd) {
     while (read(fd, &student, sizeof(student_t)) == sizeof(student_t)) {
         if (student.id != 0) {
             if (first_record) {
-                printf(STUDENT_PRINT_HDR_STRING, "ID", "FIRST NAME", "LAST NAME", "GPA");
+                printf(STUDENT_PRINT_HDR_STRING, "ID", "FIRST_NAME", "LAST_NAME", "GPA");
                 first_record = 0;
             }
             printf(STUDENT_PRINT_FMT_STRING, student.id, student.fname, student.lname, student.gpa / 100.0);
@@ -313,7 +313,7 @@ void print_student(student_t *s)
         return;
     }
 
-    printf(STUDENT_PRINT_HDR_STRING, "ID", "FIRST NAME", "LAST NAME", "GPA");
+    printf(STUDENT_PRINT_HDR_STRING, "ID", "FIRST_NAME", "LAST_NAME", "GPA");
     printf(STUDENT_PRINT_FMT_STRING, s->id, s->fname, s->lname, s->gpa / 100.0);
 }
 
@@ -468,6 +468,7 @@ int main(int argc, char *argv[])
         usage(argv[0]);
         exit(1);
     }
+
 
     // The option is the first character after the dash for example
     //-h -a -c -d -f -p -x -z
