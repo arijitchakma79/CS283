@@ -93,12 +93,7 @@ typedef struct {
     int count;
 } rle_pair_t;
 
-const rle_pair_t DREXEL_DRAGON_RLE[] = {
-    {' ', 72}, {'@', 1}, {'%', 4}, {' ', 24}, {'\n', 1},
-    {' ', 69}, {'%', 6}, {' ', 26}, {'\n', 1},
-    {' ', 68}, {'%', 6}, {' ', 27}, {'\n', 1},
-    {' ', 0} 
-};
+extern const rle_pair_t DREXEL_DRAGON_RLE[];
 void print_dragon(void); 
 
 #endif

@@ -32,6 +32,18 @@
  *  Standard Library Functions You Might Want To Consider Using
  *      memset(), strcmp(), strcpy(), strtok(), strlen(), strchr()
  */
+
+const rle_pair_t DREXEL_DRAGON_RLE[] = {
+    {' ', 72}, {'@', 1}, {'%', 4}, {' ', 24}, {'\n', 1},
+    {' ', 69}, {'%', 6}, {' ', 26}, {'\n', 1},
+    {' ', 68}, {'%', 6}, {' ', 27}, {'\n', 1},
+    {' ', 66}, {'%', 8}, {' ', 29}, {'\n', 1},
+    {' ', 60}, {'%', 12}, {' ', 35}, {'\n', 1},
+    {' ', 50}, {'%', 20}, {' ', 45}, {'\n', 1},
+    {' ', 0}  // Sentinel to mark the end of data
+};
+
+
 int build_cmd_list(char *cmd_line, command_list_t *clist)
 {
     /*Current command count = 0*/
