@@ -65,6 +65,11 @@ int main()
             exit(OK);
         };
 
+        if (strcmp(cmd_buff, "dragon") == 0) {
+            printf("%s", DREXEL_DRAGON);  
+            continue;
+        }
+
         /*Checks for empty input*/
         if (strlen(cmd_buff) == 0) {
             printf(CMD_WARN_NO_CMD);
