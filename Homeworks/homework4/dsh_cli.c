@@ -59,7 +59,7 @@ int main()
         };
         
         /*Replace the \n with \0*/
-        cmd_buff[strcspn(cmd_buff, '\n')] = '\0';
+        cmd_buff[strcspn(cmd_buff, "\n")] = '\0';
 
         if (strcmp(cmd_buff, EXIT_CMD) == 0) {
             exit(OK);
