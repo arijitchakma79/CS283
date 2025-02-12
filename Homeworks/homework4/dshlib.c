@@ -89,3 +89,14 @@ int build_cmd_list(char *cmd_line, command_list_t *clist)
 
     return OK;
 }
+
+/*Function to decompress and print the Drexel Dragon*/
+void print_dragon() {
+    const rle_pair_t *ptr = DREXEL_DRAGON_RLE;
+    while (ptr->count != 0) {  
+        for (int i = 0; i < ptr->count; i++) {
+            putchar(ptr->ch);  
+        }
+        ptr++; 
+    }
+}

@@ -88,5 +88,17 @@ int build_cmd_list(char *cmd_line, command_list_t *clist);
 "                     %%%%%%%%%%%%%%%%%%% %%%%%% %%                          %%%%%%%%%%%%%@          \n" \
 "                                                                                 %%%%%%%@          \n"
 
+typedef struct {
+    char ch;
+    int count;
+} rle_pair_t;
+
+const rle_pair_t DREXEL_DRAGON_RLE[] = {
+    {' ', 72}, {'@', 1}, {'%', 4}, {' ', 24}, {'\n', 1},
+    {' ', 69}, {'%', 6}, {' ', 26}, {'\n', 1},
+    {' ', 68}, {'%', 6}, {' ', 27}, {'\n', 1},
+    {' ', 0} 
+};
+void print_dragon(void); 
 
 #endif
