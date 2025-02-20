@@ -56,8 +56,15 @@ int main() {
     command_list_t clist;
 
     while (1) {
-        printf("dsh2> ");  // Initial prompt
+        if (isatty(STDIN_FILENO)) {
+        printf("dsh2> ");
         fflush(stdout);
+        }
+        
+        if (fgets(cmd_buff, ARG_MAX, stdin) == NULL) {
+            break;
+        }
+        cmd_buff[strcspn(cmd_buff, "\n")] = '\0';
 
         if (fgets(cmd_buff, ARG_MAX, stdin) == NULL) {
             break;
