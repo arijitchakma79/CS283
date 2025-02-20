@@ -36,62 +36,68 @@
 
 
 
-int build_cmd_list(char *cmd_line, command_list_t *clist)
-{
-    /*Current command count = 0*/
+int build_cmd_list(char *cmd_line, command_list_t *clist) {
     clist->num = 0;
-
-    char *token = strtok(cmd_line, PIPE_STRING);
+    
+    // Make a copy of cmd_line since strtok modifies the string
+    char *cmd_copy = strdup(cmd_line);
+    if (!cmd_copy) return ERR_CMD_OR_ARGS_TOO_BIG;
+    
+    char *token = strtok(cmd_copy, PIPE_STRING);
     
     while (token != NULL) {
-        /*Check if we have reached the max number of commands*/
         if (clist->num >= CMD_MAX) {
             printf(CMD_ERR_PIPE_LIMIT, CMD_MAX);
+            free(cmd_copy);
             return ERR_TOO_MANY_COMMANDS;
         }
-    
-        /*Remove leading spaces*/
-        while (*token == SPACE_CHAR) {
-            token++;
+        
+        // Skip leading spaces
+        while (*token == SPACE_CHAR) token++;
+        
+        // Find first space or quote
+        char *args_start = token;
+        int in_quotes = 0;
+        
+        // Find the executable name
+        while (*args_start && (*args_start != SPACE_CHAR || in_quotes)) {
+            if (*args_start == '"') in_quotes = !in_quotes;
+            args_start++;
         }
         
-        /*Remove spaces from end*/
-        char *end = token + strlen(token) - 1;
-        while (end > token && *end == SPACE_CHAR) {
-           *end-- = '\0';
+        // Save the executable name
+        size_t exe_len = args_start - token;
+        if (exe_len >= EXE_MAX) {
+            free(cmd_copy);
+            return ERR_CMD_OR_ARGS_TOO_BIG;
         }
-
-        /*Extract commands and arguments*/
-        char *arg_start = strchr(token, SPACE_CHAR);
-        if (arg_start != NULL) {
-            *arg_start = '\0';
-            arg_start++;
-
-            if (strlen(token) >= EXE_MAX || strlen(arg_start) >= ARG_MAX) {
-                return ERR_CMD_OR_ARGS_TOO_BIG;
-            };
-
-            strncpy(clist->commands[clist->num].exe, token, EXE_MAX - 1);
-            strncpy(clist->commands[clist->num].args, arg_start, ARG_MAX - 1);
-        } else {
-            if (strlen(token) >= EXE_MAX) {
+        strncpy(clist->commands[clist->num].exe, token, exe_len);
+        clist->commands[clist->num].exe[exe_len] = '\0';
+        
+        // Skip spaces after executable
+        while (*args_start == SPACE_CHAR) args_start++;
+        
+        // Copy remaining arguments preserving quotes
+        if (*args_start) {
+            if (strlen(args_start) >= ARG_MAX) {
+                free(cmd_copy);
                 return ERR_CMD_OR_ARGS_TOO_BIG;
             }
-            strncpy(clist->commands[clist->num].exe, token, EXE_MAX - 1);
-            clist->commands[clist->num].exe[EXE_MAX - 1] = '\0'; 
+            strcpy(clist->commands[clist->num].args, args_start);
+        } else {
             clist->commands[clist->num].args[0] = '\0';
         }
-
+        
         clist->num++;
         token = strtok(NULL, PIPE_STRING);
     }
-
+    
+    free(cmd_copy);
+    
     if (clist->num == 0) {
         printf(CMD_WARN_NO_CMD);
         return WARN_NO_CMDS;
     }
-
+    
     return OK;
 }
-
-

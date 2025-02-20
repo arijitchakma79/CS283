@@ -1,11 +1,47 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>     // fork(), pipe(), dup2(), execvp()
-#include <sys/wait.h>   // wait()
+#include <unistd.h>     
+#include <sys/wait.h>   
 #include "dshlib.h"
 
 #define MAX_ARGS 32  // Maximum number of arguments for a command
+
+
+void build_argv(char *args, char **argv, int *argCount) {
+    *argCount = 1;  // First argument is the command name
+    char *p = args;
+    int in_quotes = 0;
+    char *start = p;
+    
+    while (*p) {
+        if (*p == '"') {
+            in_quotes = !in_quotes;
+        } else if (*p == SPACE_CHAR && !in_quotes) {
+            if (start != p) {
+                *p = '\0';
+                if (*start == '"') {
+                    start++;
+                    *(p-1) = '\0';  // Remove ending quote
+                }
+                argv[(*argCount)++] = start;
+            }
+            start = p + 1;
+        }
+        p++;
+    }
+    
+    // Handle last argument
+    if (start != p && *start) {
+        if (*start == '"') {
+            start++;
+            *(p-1) = '\0';  // Remove ending quote
+        }
+        argv[(*argCount)++] = start;
+    }
+    
+    argv[*argCount] = NULL;
+}
 
 int main() {
     char cmd_buff[SH_CMD_MAX];
