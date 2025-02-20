@@ -51,59 +51,6 @@ void build_argv(const char *exe, const char *args, char **argv, int *argCount) {
     free(args_copy);
 }
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <sys/wait.h>
-#include "dshlib.h"
-
-#define MAX_ARGS 32
-
-void build_argv(const char *exe, const char *args, char **argv, int *argCount) {
-    *argCount = 0;
-    argv[(*argCount)++] = strdup(exe);  // Make a copy of exe
-    
-    if (!args || !*args) {
-        argv[*argCount] = NULL;
-        return;
-    }
-
-    char *args_copy = strdup(args);
-    char *p = args_copy;
-    char *start = p;
-    int in_quotes = 0;
-    
-    while (*p) {
-        if (*p == '"') {
-            if (!in_quotes) {
-                start = p + 1;
-            } else {
-                *p = '\0';
-                if (p > start) {
-                    argv[(*argCount)++] = strdup(start);
-                }
-                start = p + 1;
-            }
-            in_quotes = !in_quotes;
-        } else if (*p == ' ' && !in_quotes) {
-            *p = '\0';
-            if (p > start) {
-                argv[(*argCount)++] = strdup(start);
-            }
-            start = p + 1;
-        }
-        p++;
-    }
-    
-    if (*start) {
-        argv[(*argCount)++] = strdup(start);
-    }
-    
-    argv[*argCount] = NULL;
-    free(args_copy);
-}
-
 int main() {
     char cmd_buff[SH_CMD_MAX];
     command_list_t clist;
