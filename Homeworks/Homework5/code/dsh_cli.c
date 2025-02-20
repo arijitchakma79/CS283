@@ -1,46 +1,56 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>     
-#include <sys/wait.h>   
+#include <unistd.h>
+#include <sys/wait.h>
 #include "dshlib.h"
 
-#define MAX_ARGS 32  // Maximum number of arguments for a command
+#define MAX_ARGS 32
 
+// Helper function to handle quoted arguments
+void build_argv(const char *exe, const char *args, char **argv, int *argCount) {
+    *argCount = 0;
+    argv[(*argCount)++] = (char *)exe;  // First argument is the command name
+    
+    if (!args || !*args) {
+        argv[*argCount] = NULL;
+        return;
+    }
 
-void build_argv(char *args, char **argv, int *argCount) {
-    *argCount = 1;  // First argument is the command name
-    char *p = args;
+    char *args_copy = strdup(args);
+    char *p = args_copy;
     int in_quotes = 0;
     char *start = p;
     
     while (*p) {
         if (*p == '"') {
-            in_quotes = !in_quotes;
-        } else if (*p == SPACE_CHAR && !in_quotes) {
-            if (start != p) {
-                *p = '\0';
-                if (*start == '"') {
-                    start++;
-                    *(p-1) = '\0';  // Remove ending quote
+            if (!in_quotes) {
+                start = p + 1;  // Skip the opening quote
+            } else {
+                *p = '\0';  // Replace closing quote with null
+                if (start != p) {
+                    argv[(*argCount)++] = strdup(start);
                 }
-                argv[(*argCount)++] = start;
+                start = p + 1;
+            }
+            in_quotes = !in_quotes;
+        } else if (*p == ' ' && !in_quotes) {
+            *p = '\0';
+            if (start != p) {
+                argv[(*argCount)++] = strdup(start);
             }
             start = p + 1;
         }
         p++;
     }
     
-    // Handle last argument
-    if (start != p && *start) {
-        if (*start == '"') {
-            start++;
-            *(p-1) = '\0';  // Remove ending quote
-        }
-        argv[(*argCount)++] = start;
+    // Handle the last argument
+    if (*start && start < p) {
+        argv[(*argCount)++] = strdup(start);
     }
     
     argv[*argCount] = NULL;
+    free(args_copy);
 }
 
 int main() {
@@ -48,19 +58,15 @@ int main() {
     command_list_t clist;
 
     while (1) {
-        // Print the shell prompt
         printf("%s", SH_PROMPT);
         fflush(stdout);
 
-        // Read user input (EOF is handled for headless testing)
         if (fgets(cmd_buff, ARG_MAX, stdin) == NULL) {
             printf("\n");
             break;
         }
-        // Remove trailing newline
         cmd_buff[strcspn(cmd_buff, "\n")] = '\0';
 
-        // Handle built-in commands: exit and dragon
         if (strcmp(cmd_buff, EXIT_CMD) == 0) {
             exit(OK);
         }
@@ -68,57 +74,35 @@ int main() {
             print_dragon();
             continue;
         }
-        // Check for empty input
         if (strlen(cmd_buff) == 0) {
             printf(CMD_WARN_NO_CMD);
             continue;
         }
 
-        // Parse the command line into a command list
         int rc = build_cmd_list(cmd_buff, &clist);
         if (rc != OK) {
             continue;
         }
 
-        // If only one command, no piping is required.
         if (clist.num == 1) {
             pid_t pid = fork();
             if (pid < 0) {
                 perror("fork");
                 exit(EXIT_FAILURE);
             } else if (pid == 0) {
-                // Child: build argv array for the command
                 char *argv[MAX_ARGS];
-                int argCount = 0;
-                argv[argCount++] = clist.commands[0].exe;
-
-                // Tokenize the arguments string
-                char *args_copy = strdup(clist.commands[0].args);
-                if (args_copy) {
-                    char *token = strtok(args_copy, " ");
-                    while (token != NULL && argCount < MAX_ARGS - 1) {
-                        argv[argCount++] = token;
-                        token = strtok(NULL, " ");
-                    }
-                    free(args_copy);
-                }
-                argv[argCount] = NULL;
-
-                // Execute the external command
+                int argCount;
+                build_argv(clist.commands[0].exe, clist.commands[0].args, argv, &argCount);
                 execvp(argv[0], argv);
                 perror("execvp");
                 exit(EXIT_FAILURE);
             } else {
-                // Parent: wait for the child process to finish
                 wait(NULL);
             }
-        }
-        // More than one command: set up pipeline
-        else {
+        } else {
             int num_pipes = clist.num - 1;
             int pipes[num_pipes][2];
 
-            // Create the required pipes
             for (int i = 0; i < num_pipes; i++) {
                 if (pipe(pipes[i]) < 0) {
                     perror("pipe");
@@ -126,62 +110,38 @@ int main() {
                 }
             }
 
-            // Fork one child process per command
             for (int i = 0; i < clist.num; i++) {
                 pid_t pid = fork();
                 if (pid < 0) {
                     perror("fork");
                     exit(EXIT_FAILURE);
                 } else if (pid == 0) {
-                    // If not the first command, set stdin to the previous pipe’s read end
                     if (i > 0) {
-                        if (dup2(pipes[i - 1][0], STDIN_FILENO) < 0) {
-                            perror("dup2 (stdin)");
-                            exit(EXIT_FAILURE);
-                        }
+                        dup2(pipes[i - 1][0], STDIN_FILENO);
                     }
-                    // If not the last command, set stdout to the current pipe’s write end
                     if (i < clist.num - 1) {
-                        if (dup2(pipes[i][1], STDOUT_FILENO) < 0) {
-                            perror("dup2 (stdout)");
-                            exit(EXIT_FAILURE);
-                        }
+                        dup2(pipes[i][1], STDOUT_FILENO);
                     }
-                    // Close all pipe file descriptors in the child
+
                     for (int j = 0; j < num_pipes; j++) {
                         close(pipes[j][0]);
                         close(pipes[j][1]);
                     }
 
-                    // Build argv array for the command
                     char *argv[MAX_ARGS];
-                    int argCount = 0;
-                    argv[argCount++] = clist.commands[i].exe;
-                    char *args_copy = strdup(clist.commands[i].args);
-                    if (args_copy) {
-                        char *token = strtok(args_copy, " ");
-                        while (token != NULL && argCount < MAX_ARGS - 1) {
-                            argv[argCount++] = token;
-                            token = strtok(NULL, " ");
-                        }
-                        free(args_copy);
-                    }
-                    argv[argCount] = NULL;
-
-                    // Execute the command
+                    int argCount;
+                    build_argv(clist.commands[i].exe, clist.commands[i].args, argv, &argCount);
                     execvp(argv[0], argv);
                     perror("execvp");
                     exit(EXIT_FAILURE);
                 }
-                // Parent continues to fork next command
             }
 
-            // Parent: close all pipe file descriptors
             for (int i = 0; i < num_pipes; i++) {
                 close(pipes[i][0]);
                 close(pipes[i][1]);
             }
-            // Wait for all child processes to finish
+
             for (int i = 0; i < clist.num; i++) {
                 wait(NULL);
             }
