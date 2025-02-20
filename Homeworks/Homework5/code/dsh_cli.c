@@ -7,10 +7,9 @@
 
 #define MAX_ARGS 32
 
-// Helper function to handle quoted arguments
 void build_argv(const char *exe, const char *args, char **argv, int *argCount) {
     *argCount = 0;
-    argv[(*argCount)++] = (char *)exe;  // First argument is the command name
+    argv[(*argCount)++] = strdup(exe);  // Make a copy of exe
     
     if (!args || !*args) {
         argv[*argCount] = NULL;
@@ -19,16 +18,16 @@ void build_argv(const char *exe, const char *args, char **argv, int *argCount) {
 
     char *args_copy = strdup(args);
     char *p = args_copy;
-    int in_quotes = 0;
     char *start = p;
+    int in_quotes = 0;
     
     while (*p) {
         if (*p == '"') {
             if (!in_quotes) {
-                start = p + 1;  // Skip the opening quote
+                start = p + 1;
             } else {
-                *p = '\0';  // Replace closing quote with null
-                if (start != p) {
+                *p = '\0';
+                if (p > start) {
                     argv[(*argCount)++] = strdup(start);
                 }
                 start = p + 1;
@@ -36,7 +35,7 @@ void build_argv(const char *exe, const char *args, char **argv, int *argCount) {
             in_quotes = !in_quotes;
         } else if (*p == ' ' && !in_quotes) {
             *p = '\0';
-            if (start != p) {
+            if (p > start) {
                 argv[(*argCount)++] = strdup(start);
             }
             start = p + 1;
@@ -44,8 +43,7 @@ void build_argv(const char *exe, const char *args, char **argv, int *argCount) {
         p++;
     }
     
-    // Handle the last argument
-    if (*start && start < p) {
+    if (*start) {
         argv[(*argCount)++] = strdup(start);
     }
     

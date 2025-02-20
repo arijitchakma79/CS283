@@ -34,12 +34,9 @@
  */
 
 
-
-
 int build_cmd_list(char *cmd_line, command_list_t *clist) {
     clist->num = 0;
     
-    // Make a copy of cmd_line since strtok modifies the string
     char *cmd_copy = strdup(cmd_line);
     if (!cmd_copy) return ERR_CMD_OR_ARGS_TOO_BIG;
     
@@ -55,36 +52,37 @@ int build_cmd_list(char *cmd_line, command_list_t *clist) {
         // Skip leading spaces
         while (*token == SPACE_CHAR) token++;
         
-        // Find first space or quote
-        char *args_start = token;
-        int in_quotes = 0;
-        
-        // Find the executable name
-        while (*args_start && (*args_start != SPACE_CHAR || in_quotes)) {
-            if (*args_start == '"') in_quotes = !in_quotes;
-            args_start++;
-        }
-        
-        // Save the executable name
-        size_t exe_len = args_start - token;
-        if (exe_len >= EXE_MAX) {
-            free(cmd_copy);
-            return ERR_CMD_OR_ARGS_TOO_BIG;
-        }
-        strncpy(clist->commands[clist->num].exe, token, exe_len);
-        clist->commands[clist->num].exe[exe_len] = '\0';
-        
-        // Skip spaces after executable
-        while (*args_start == SPACE_CHAR) args_start++;
-        
-        // Copy remaining arguments preserving quotes
-        if (*args_start) {
-            if (strlen(args_start) >= ARG_MAX) {
+        // Handle the executable name first
+        char *space = strchr(token, SPACE_CHAR);
+        if (space) {
+            size_t exe_len = space - token;
+            if (exe_len >= EXE_MAX) {
                 free(cmd_copy);
                 return ERR_CMD_OR_ARGS_TOO_BIG;
             }
-            strcpy(clist->commands[clist->num].args, args_start);
+            strncpy(clist->commands[clist->num].exe, token, exe_len);
+            clist->commands[clist->num].exe[exe_len] = '\0';
+            
+            // Skip spaces after executable
+            while (*space == SPACE_CHAR) space++;
+            
+            // Handle the arguments
+            if (*space) {
+                if (strlen(space) >= ARG_MAX) {
+                    free(cmd_copy);
+                    return ERR_CMD_OR_ARGS_TOO_BIG;
+                }
+                strcpy(clist->commands[clist->num].args, space);
+            } else {
+                clist->commands[clist->num].args[0] = '\0';
+            }
         } else {
+            // No arguments, just executable
+            if (strlen(token) >= EXE_MAX) {
+                free(cmd_copy);
+                return ERR_CMD_OR_ARGS_TOO_BIG;
+            }
+            strcpy(clist->commands[clist->num].exe, token);
             clist->commands[clist->num].args[0] = '\0';
         }
         
