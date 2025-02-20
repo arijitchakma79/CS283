@@ -189,7 +189,7 @@ int main() {
         fflush(stdout);
     }
 
-    // Print the final message (no newline)
+    // Print the final message 
     printf("cmd loop returned 0");
     return 0;
 }
