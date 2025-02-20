@@ -1,39 +1,53 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
-#include <sys/wait.h>
+#include <unistd.h>     // fork(), dup2()
+#include <sys/wait.h>   // wait()
 #include "dshlib.h"
 
 #define MAX_ARGS 32
 
+/*
+ * build_argv
+ *
+ * Splits 'exe' + 'args' into an argv array for execvp.
+ * Preserves trailing spaces inside quotes.
+ */
 void build_argv(const char *exe, const char *args, char **argv, int *argCount) {
     *argCount = 0;
+    // First element is always the executable
     argv[(*argCount)++] = strdup(exe);
-    
+
+    // If no args, terminate argv
     if (!args || !*args) {
         argv[*argCount] = NULL;
         return;
     }
 
+    // Copy args so we can modify it
     char *args_copy = strdup(args);
     char *p = args_copy;
     char *start = p;
     int in_quotes = 0;
-    
+
     while (*p) {
         if (*p == '"') {
+            // Toggle in_quotes
             if (!in_quotes) {
+                // Start of quoted section (skip the quote)
                 start = p + 1;
             } else {
-                *p = '\0';
+                // End of quoted section
+                *p = '\0'; // terminate the token
                 if (p > start) {
                     argv[(*argCount)++] = strdup(start);
                 }
-                start = p + 1;
+                start = p + 1; // move past the closing quote
             }
             in_quotes = !in_quotes;
-        } else if (*p == ' ' && !in_quotes) {
+        }
+        else if (*p == ' ' && !in_quotes) {
+            // End of an unquoted token
             *p = '\0';
             if (p > start) {
                 argv[(*argCount)++] = strdup(start);
@@ -42,11 +56,10 @@ void build_argv(const char *exe, const char *args, char **argv, int *argCount) {
         }
         p++;
     }
-    
+    // Last token
     if (*start) {
         argv[(*argCount)++] = strdup(start);
     }
-    
     argv[*argCount] = NULL;
     free(args_copy);
 }
@@ -55,55 +68,58 @@ int main() {
     char cmd_buff[SH_CMD_MAX];
     command_list_t clist;
 
+    // Print the initial prompt
+    printf("dsh2> ");
+    fflush(stdout);
+
+    // Main command loop
     while (1) {
-        if (isatty(STDIN_FILENO)) {
-        printf("dsh2> ");
-        fflush(stdout);
-        }
-        
-        if (fgets(cmd_buff, ARG_MAX, stdin) == NULL) {
+        // Read next command
+        if (!fgets(cmd_buff, ARG_MAX, stdin)) {
+            // EOF => print one final prompt, then exit
+            printf("dsh2> ");
+            fflush(stdout);
             break;
         }
+        // Strip trailing newline
         cmd_buff[strcspn(cmd_buff, "\n")] = '\0';
 
-        if (fgets(cmd_buff, ARG_MAX, stdin) == NULL) {
-            break;
-        }
-        cmd_buff[strcspn(cmd_buff, "\n")] = '\0';
-
+        // Check built-ins
         if (strcmp(cmd_buff, EXIT_CMD) == 0) {
-            break;
+            break; // exit the shell
         }
         if (strcmp(cmd_buff, "dragon") == 0) {
             print_dragon();
+            // Print prompt again
+            printf("dsh2> ");
+            fflush(stdout);
             continue;
         }
+        // Empty input
         if (strlen(cmd_buff) == 0) {
             printf("%s", CMD_WARN_NO_CMD);
+            printf("dsh2> ");
+            fflush(stdout);
             continue;
         }
 
+        // Parse the command line into clist
         int rc = build_cmd_list(cmd_buff, &clist);
         if (rc != OK) {
+            // If parse error or no commands, print prompt and continue
+            printf("dsh2> ");
+            fflush(stdout);
             continue;
         }
 
+        // Single command
         if (clist.num == 1) {
-            int pipefd[2];
-            if (pipe(pipefd) == -1) {
-                perror("pipe");
-                exit(EXIT_FAILURE);
-            }
-
             pid_t pid = fork();
             if (pid < 0) {
                 perror("fork");
                 exit(EXIT_FAILURE);
             } else if (pid == 0) {
-                close(pipefd[0]);
-                dup2(pipefd[1], STDOUT_FILENO);
-                close(pipefd[1]);
-
+                // Child
                 char *argv[MAX_ARGS];
                 int argCount;
                 build_argv(clist.commands[0].exe, clist.commands[0].args, argv, &argCount);
@@ -111,37 +127,21 @@ int main() {
                 perror("execvp");
                 exit(EXIT_FAILURE);
             } else {
-                close(pipefd[1]);
-                
-                char buffer[4096];
-                ssize_t count = read(pipefd[0], buffer, sizeof(buffer)-1);
-                if (count > 0) {
-                    buffer[count] = '\0';
-                    if (count > 0 && buffer[count-1] == '\n') {
-                        buffer[count-1] = '\0';
-                    }
-                    printf("%s", buffer);
-                }
-                close(pipefd[0]);
+                // Parent
                 wait(NULL);
             }
-        } else {
+        }
+        // Pipeline
+        else {
             int num_pipes = clist.num - 1;
             int pipes[num_pipes][2];
 
-            // Create all needed pipes
+            // Create all pipes
             for (int i = 0; i < num_pipes; i++) {
-                if (pipe(pipes[i]) == -1) {
+                if (pipe(pipes[i]) < 0) {
                     perror("pipe");
                     exit(EXIT_FAILURE);
                 }
-            }
-
-            // Create a pipe for capturing final output
-            int final_pipe[2];
-            if (pipe(final_pipe) == -1) {
-                perror("pipe");
-                exit(EXIT_FAILURE);
             }
 
             // Fork for each command
@@ -151,27 +151,20 @@ int main() {
                     perror("fork");
                     exit(EXIT_FAILURE);
                 } else if (pid == 0) {
-                    // Set up input from previous pipe if not first command
+                    // Child: set up stdin from previous pipe if not the first command
                     if (i > 0) {
                         dup2(pipes[i - 1][0], STDIN_FILENO);
                     }
-
-                    // Set up output to next pipe if not last command
+                    // Set up stdout to next pipe if not the last command
                     if (i < clist.num - 1) {
                         dup2(pipes[i][1], STDOUT_FILENO);
-                    } else {
-                        // Last command outputs to final pipe
-                        dup2(final_pipe[1], STDOUT_FILENO);
                     }
-
-                    // Close all pipe fds in child
+                    // Close all pipe fds
                     for (int j = 0; j < num_pipes; j++) {
                         close(pipes[j][0]);
                         close(pipes[j][1]);
                     }
-                    close(final_pipe[0]);
-                    close(final_pipe[1]);
-
+                    // Exec
                     char *argv[MAX_ARGS];
                     int argCount;
                     build_argv(clist.commands[i].exe, clist.commands[i].args, argv, &argCount);
@@ -180,34 +173,24 @@ int main() {
                     exit(EXIT_FAILURE);
                 }
             }
-
-            // Parent: close all pipe fds
+            // Parent: close all pipes
             for (int i = 0; i < num_pipes; i++) {
                 close(pipes[i][0]);
                 close(pipes[i][1]);
             }
-            close(final_pipe[1]);
-
-            // Read final output
-            char buffer[4096];
-            ssize_t count = read(final_pipe[0], buffer, sizeof(buffer)-1);
-            if (count > 0) {
-                buffer[count] = '\0';
-                if (count > 0 && buffer[count-1] == '\n') {
-                    buffer[count-1] = '\0';
-                }
-                printf("%s", buffer);
-            }
-            close(final_pipe[0]);
-
-            // Wait for all children
+            // Wait for children
             for (int i = 0; i < clist.num; i++) {
                 wait(NULL);
             }
         }
+
+        // After executing the command, print the prompt again
         printf("dsh2> ");
         fflush(stdout);
     }
+
+    // Print the final message (no newline)
     printf("cmd loop returned 0");
-    return OK;
+    return 0;
 }
+
