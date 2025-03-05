@@ -7,6 +7,8 @@
 
 #define MAX_ARGS 32
 
+// Proper declaration of print_dragon function
+extern void print_dragon(void);
 /*
  * build_argv
  *
@@ -64,6 +66,7 @@ void build_argv(const char *exe, const char *args, char **argv, int *argCount) {
     free(args_copy);
 }
 
+
 int main() {
     char cmd_buff[SH_CMD_MAX];
     command_list_t clist;
@@ -120,11 +123,8 @@ int main() {
                 perror("fork");
                 exit(EXIT_FAILURE);
             } else if (pid == 0) {
-                // Child
-                char *argv[MAX_ARGS];
-                int argCount;
-                build_argv(clist.commands[0].exe, clist.commands[0].args, argv, &argCount);
-                execvp(argv[0], argv);
+                // Child - use the argv directly from cmd_buff_t
+                execvp(clist.commands[0].argv[0], clist.commands[0].argv);
                 perror("execvp");
                 exit(EXIT_FAILURE);
             } else {
@@ -165,11 +165,8 @@ int main() {
                         close(pipes[j][0]);
                         close(pipes[j][1]);
                     }
-                    // Exec
-                    char *argv[MAX_ARGS];
-                    int argCount;
-                    build_argv(clist.commands[i].exe, clist.commands[i].args, argv, &argCount);
-                    execvp(argv[0], argv);
+                    // Exec - use the argv directly from cmd_buff_t
+                    execvp(clist.commands[i].argv[0], clist.commands[i].argv);
                     perror("execvp");
                     exit(EXIT_FAILURE);
                 }
