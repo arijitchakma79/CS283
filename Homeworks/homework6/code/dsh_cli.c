@@ -188,6 +188,6 @@ int main() {
     }
 
     // Print the final message 
-    printf("cmd loop returned 0");
+    printf("cmd loop returned 0\n");
     return 0;
 }
