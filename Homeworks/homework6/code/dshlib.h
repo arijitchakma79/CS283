@@ -54,7 +54,7 @@ typedef struct command_list{
 #define PIPE_STRING "|"
 #define REDIR_IN_CHAR '<'
 #define REDIR_OUT_CHAR '>'
-#define SH_PROMPT "dsh2> "
+#define SH_PROMPT "dsh3> "
 #define EXIT_CMD "exit"
 #define EXIT_SC     99
 //Standard Return Codes
