@@ -6,7 +6,7 @@
 #include <sys/wait.h>
 #include <fcntl.h>  // For open(), O_* constants
 #include "dshlib.h"
-
+#include <errno.h>
 
 extern void print_dragon(void);
 /*
