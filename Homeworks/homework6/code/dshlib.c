@@ -394,11 +394,14 @@ int exec_cmd(cmd_buff_t *cmd) {
         
         // Handle input redirection
         if (cmd->in_redir_type == REDIR_IN) {
+            fprintf(stderr, "DEBUG: Opening input file: '%s'\n", cmd->in_redir_file);
             int fd = open(cmd->in_redir_file, O_RDONLY);
             if (fd < 0) {
+                fprintf(stderr, "DEBUG: Failed to open input file: %s\n", strerror(errno));
                 perror("open input");
                 exit(EXIT_FAILURE);
             }
+            fprintf(stderr, "DEBUG: Successfully opened input file, fd=%d\n", fd);
             if (dup2(fd, STDIN_FILENO) < 0) {
                 perror("dup2 input");
                 exit(EXIT_FAILURE);
@@ -408,6 +411,10 @@ int exec_cmd(cmd_buff_t *cmd) {
         
         // Handle output redirection
         if (cmd->out_redir_type != REDIR_NONE) {
+            fprintf(stderr, "DEBUG: Opening output file: '%s', mode: %s\n", 
+                cmd->out_redir_file, 
+                cmd->out_redir_type == REDIR_APPEND ? "append" : "truncate");
+
             int flags = O_WRONLY | O_CREAT;
             if (cmd->out_redir_type == REDIR_APPEND) {
                 flags |= O_APPEND;
