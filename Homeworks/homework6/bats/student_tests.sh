@@ -123,20 +123,26 @@ EOF
     rm -f test_out.txt
 }
 
-# Test input redirection
 @test "Extra Credit: Input redirection with <" {
-    # First create a test file
-    echo "test input redirection" > test_in.txt
+    # Create test file with explicit location
+    echo "test input redirection" > ./test_in.txt
+    # Make it readable
+    chmod 644 ./test_in.txt
     
     run ./dsh <<EOF
-cat < test_in.txt
+cat < ./test_in.txt
 EOF
-    # Check if the content was read correctly
+    # For debugging
+    echo "Output: $output"
+    echo "File content:"
+    cat ./test_in.txt
+    
+    # Check if content was read correctly
     [[ "$output" == *"test input redirection"* ]]
     [ "$status" -eq 0 ]
     
     # Clean up
-    rm -f test_in.txt
+    rm -f ./test_in.txt
 }
 
 # Test append redirection
@@ -170,19 +176,26 @@ EOF
     rm -f pipe_out.txt
 }
 
-# Test complex redirection
 @test "Extra Credit: Complex redirection" {
-    # Create input file
-    echo "This is a test file with the word dragon in it." > complex_in.txt
+    # Create input file with explicit location
+    echo "This is a test file with the word dragon in it." > ./complex_in.txt
+    chmod 644 ./complex_in.txt
     
     run ./dsh <<EOF
-cat < complex_in.txt | grep dragon > complex_out.txt
-cat complex_out.txt
+cat < ./complex_in.txt | grep dragon > ./complex_out.txt
+cat ./complex_out.txt
 EOF
+    # For debugging
+    echo "Output: $output"
+    echo "Input file content:"
+    cat ./complex_in.txt
+    echo "Output file content (if created):"
+    cat ./complex_out.txt 2>/dev/null || echo "Output file not created"
+    
     # Check if the filtered content was saved correctly
     [[ "$output" == *"dragon"* ]]
     [ "$status" -eq 0 ]
     
     # Clean up
-    rm -f complex_in.txt complex_out.txt
+    rm -f ./complex_in.txt ./complex_out.txt
 }
