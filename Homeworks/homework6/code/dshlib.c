@@ -7,6 +7,8 @@
 #include <fcntl.h>  // For open(), O_* constants
 #include "dshlib.h"
 
+
+extern void print_dragon(void);
 /*
  * alloc_cmd_buff
  *
