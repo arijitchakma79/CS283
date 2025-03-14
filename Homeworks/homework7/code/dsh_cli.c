@@ -1,193 +1,149 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>     // fork(), dup2()
-#include <sys/wait.h>   // wait()
+#include <argp.h>
+#include <getopt.h>
+
 #include "dshlib.h"
+#include "rshlib.h"
 
-#define MAX_ARGS 32
 
-// Proper declaration of print_dragon function
-extern void print_dragon(void);
 /*
- * build_argv
- *
- * Splits 'exe' + 'args' into an argv array for execvp.
- * Preserves trailing spaces inside quotes.
+ * Used to pass startup parameters back to main
  */
-void build_argv(const char *exe, const char *args, char **argv, int *argCount) {
-    *argCount = 0;
-    // First element is always the executable
-    argv[(*argCount)++] = strdup(exe);
+#define MODE_LCLI   0       //Local client
+#define MODE_SCLI   1       //Socket client
+#define MODE_SSVR   2       //Socket server
 
-    // If no args, terminate argv
-    if (!args || !*args) {
-        argv[*argCount] = NULL;
-        return;
-    }
+typedef struct cmd_args{
+  int   mode;
+  char  ip[16];   //e.g., 192.168.100.101\0
+  int   port;
+  int   threaded_server;
+}cmd_args_t;
 
-    // Copy args so we can modify it
-    char *args_copy = strdup(args);
-    char *p = args_copy;
-    char *start = p;
-    int in_quotes = 0;
 
-    while (*p) {
-        if (*p == '"') {
-            // Toggle in_quotes
-            if (!in_quotes) {
-                // Start of quoted section (skip the quote)
-                start = p + 1;
-            } else {
-                // End of quoted section
-                *p = '\0'; // terminate the token
-                if (p > start) {
-                    argv[(*argCount)++] = strdup(start);
-                }
-                start = p + 1; // move past the closing quote
-            }
-            in_quotes = !in_quotes;
-        }
-        else if (*p == ' ' && !in_quotes) {
-            // End of an unquoted token
-            *p = '\0';
-            if (p > start) {
-                argv[(*argCount)++] = strdup(start);
-            }
-            start = p + 1;
-        }
-        p++;
-    }
-    // Last token
-    if (*start) {
-        argv[(*argCount)++] = strdup(start);
-    }
-    argv[*argCount] = NULL;
-    free(args_copy);
+
+//You dont really need to understand this but the C runtime library provides
+//an getopt() service to simplify handling command line arguments.  This
+//code will help setup dsh to handle triggering client or server mode along
+//with passing optional connection parameters. 
+
+void print_usage(const char *progname) {
+  printf("Usage: %s [-c | -s] [-i IP] [-p PORT] [-x] [-h]\n", progname);
+  printf("  Default is to run %s in local mode\n", progname);
+  printf("  -c            Run as client\n");
+  printf("  -s            Run as server\n");
+  printf("  -i IP         Set IP/Interface address (only valid with -c or -s)\n");
+  printf("  -p PORT       Set port number (only valid with -c or -s)\n");
+  printf("  -x            Enable threaded mode (only valid with -s)\n");
+  printf("  -h            Show this help message\n");
+  exit(0);
+}
+
+void parse_args(int argc, char *argv[], cmd_args_t *cargs) {
+  int opt;
+  memset(cargs, 0, sizeof(cmd_args_t));
+
+  //defaults
+  cargs->mode = MODE_LCLI;
+  cargs->port = RDSH_DEF_PORT;
+
+  while ((opt = getopt(argc, argv, "csi:p:xh")) != -1) {
+      switch (opt) {
+          case 'c':
+              if (cargs->mode != MODE_LCLI) {
+                  fprintf(stderr, "Error: Cannot use both -c and -s\n");
+                  exit(EXIT_FAILURE);
+              }
+              cargs->mode = MODE_SCLI;
+              strncpy(cargs->ip, RDSH_DEF_CLI_CONNECT, sizeof(cargs->ip) - 1);
+              break;
+          case 's':
+              if (cargs->mode != MODE_LCLI) {
+                  fprintf(stderr, "Error: Cannot use both -c and -s\n");
+                  exit(EXIT_FAILURE);
+              }
+              cargs->mode = MODE_SSVR;
+              strncpy(cargs->ip, RDSH_DEF_SVR_INTFACE, sizeof(cargs->ip) - 1);
+              break;
+          case 'i':
+              if (cargs->mode == MODE_LCLI) {
+                  fprintf(stderr, "Error: -i can only be used with -c or -s\n");
+                  exit(EXIT_FAILURE);
+              }
+              strncpy(cargs->ip, optarg, sizeof(cargs->ip) - 1);
+              cargs->ip[sizeof(cargs->ip) - 1] = '\0';  // Ensure null termination
+              break;
+          case 'p':
+              if (cargs->mode == MODE_LCLI) {
+                  fprintf(stderr, "Error: -p can only be used with -c or -s\n");
+                  exit(EXIT_FAILURE);
+              }
+              cargs->port = atoi(optarg);
+              if (cargs->port <= 0) {
+                  fprintf(stderr, "Error: Invalid port number\n");
+                  exit(EXIT_FAILURE);
+              }
+              break;
+          case 'x':
+              if (cargs->mode != MODE_SSVR) {
+                  fprintf(stderr, "Error: -x can only be used with -s\n");
+                  exit(EXIT_FAILURE);
+              }
+              cargs->threaded_server = 1;
+              break;
+          case 'h':
+              print_usage(argv[0]);
+              break;
+          default:
+              print_usage(argv[0]);
+      }
+  }
+
+  if (cargs->threaded_server && cargs->mode != MODE_SSVR) {
+      fprintf(stderr, "Error: -x can only be used with -s\n");
+      exit(EXIT_FAILURE);
+  }
 }
 
 
-int main() {
-    char cmd_buff[SH_CMD_MAX];
-    command_list_t clist;
 
-    // Print the initial prompt
-    printf("dsh3> ");
-    fflush(stdout);
+/* DO NOT EDIT
+ * main() logic fully implemented to:
+ *    1. run locally (no parameters)
+ *    2. start the server with the -s option
+ *    3. start the client with the -c option
+*/
+int main(int argc, char *argv[]){
+  cmd_args_t cargs;
+  int rc;
 
-    // Main command loop
-    while (1) {
-        // Read next command
-        if (!fgets(cmd_buff, ARG_MAX, stdin)) {
-            // EOF => print one final prompt, then exit
-            printf("dsh3> ");
-            fflush(stdout);
-            break;
-        }
-        // Strip trailing newline
-        cmd_buff[strcspn(cmd_buff, "\n")] = '\0';
+  memset(&cargs, 0, sizeof(cmd_args_t));
+  parse_args(argc, argv, &cargs);
 
-        // Check built-ins
-        if (strcmp(cmd_buff, EXIT_CMD) == 0) {
-            printf("exiting...\n");
-            break; // exit the shell
-        }
-        if (strcmp(cmd_buff, "dragon") == 0) {
-            print_dragon();
-            // Print prompt again
-            printf("dsh3> ");
-            fflush(stdout);
-            continue;
-        }
-        // Empty input
-        if (strlen(cmd_buff) == 0) {
-            printf("%s", CMD_WARN_NO_CMD);
-            printf("dsh3> ");
-            fflush(stdout);
-            continue;
-        }
+  switch(cargs.mode){
+    case MODE_LCLI:
+      printf("local mode\n");
+      rc = exec_local_cmd_loop();
+      break;
+    case MODE_SCLI:
+      printf("socket client mode:  addr:%s:%d\n", cargs.ip, cargs.port);
+      rc = exec_remote_cmd_loop(cargs.ip, cargs.port);
+      break;
+    case MODE_SSVR:
+      printf("socket server mode:  addr:%s:%d\n", cargs.ip, cargs.port);
+      if (cargs.threaded_server){
+        printf("-> Multi-Threaded Mode\n");
+      } else {
+        printf("-> Single-Threaded Mode\n");
+      }
+      rc = start_server(cargs.ip, cargs.port, cargs.threaded_server);
+      break;
+    default:
+      printf("error unknown mode\n");
+      exit(EXIT_FAILURE);
+  }
 
-        // Parse the command line into clist
-        int rc = build_cmd_list(cmd_buff, &clist);
-        if (rc != OK) {
-            // If parse error or no commands, print prompt and continue
-            printf("dsh3> ");
-            fflush(stdout);
-            continue;
-        }
-
-        // Single command
-        if (clist.num == 1) {
-            pid_t pid = fork();
-            if (pid < 0) {
-                perror("fork");
-                exit(EXIT_FAILURE);
-            } else if (pid == 0) {
-                // Child - use the argv directly from cmd_buff_t
-                execvp(clist.commands[0].argv[0], clist.commands[0].argv);
-                perror("execvp");
-                exit(EXIT_FAILURE);
-            } else {
-                // Parent
-                wait(NULL);
-            }
-        }
-        // Pipeline
-        else {
-            int num_pipes = clist.num - 1;
-            int pipes[num_pipes][2];
-
-            // Create all pipes
-            for (int i = 0; i < num_pipes; i++) {
-                if (pipe(pipes[i]) < 0) {
-                    perror("pipe");
-                    exit(EXIT_FAILURE);
-                }
-            }
-
-            // Fork for each command
-            for (int i = 0; i < clist.num; i++) {
-                pid_t pid = fork();
-                if (pid < 0) {
-                    perror("fork");
-                    exit(EXIT_FAILURE);
-                } else if (pid == 0) {
-                    // Child: set up stdin from previous pipe if not the first command
-                    if (i > 0) {
-                        dup2(pipes[i - 1][0], STDIN_FILENO);
-                    }
-                    // Set up stdout to next pipe if not the last command
-                    if (i < clist.num - 1) {
-                        dup2(pipes[i][1], STDOUT_FILENO);
-                    }
-                    // Close all pipe fds
-                    for (int j = 0; j < num_pipes; j++) {
-                        close(pipes[j][0]);
-                        close(pipes[j][1]);
-                    }
-                    // Exec - use the argv directly from cmd_buff_t
-                    execvp(clist.commands[i].argv[0], clist.commands[i].argv);
-                    perror("execvp");
-                    exit(EXIT_FAILURE);
-                }
-            }
-            // Parent: close all pipes
-            for (int i = 0; i < num_pipes; i++) {
-                close(pipes[i][0]);
-                close(pipes[i][1]);
-            }
-            // Wait for children
-            for (int i = 0; i < clist.num; i++) {
-                wait(NULL);
-            }
-        }
-
-        // After executing the command, print the prompt again
-        printf("dsh3> ");
-        fflush(stdout);
-    }
-
-    // Print the final message 
-    printf("cmd loop returned 0\n");
-    return 0;
+  printf("cmd loop returned %d\n", rc);
 }
