@@ -131,44 +131,41 @@ teardown() {
   [[ "$output" == *"error: piping limited"* ]]
 }
 
-# ---- Extra Credit Tests (uncomment if implemented) ----
+@test "Extra Credit: input redirection" {
+  run bash -c 'echo "cat < '"$TEST_FILE"'" | ./dsh'
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"This is a test file content"* ]]
+}
 
-# @test "Extra Credit: input redirection" {
-#   run bash -c 'echo "cat < '"$TEST_FILE"'" | ./dsh'
-#   [ "$status" -eq 0 ]
-#   [[ "$output" == *"This is a test file content"* ]]
-# }
+@test "Extra Credit: output redirection" {
+  OUTPUT_FILE="${TEST_TEMP_DIR}/output.txt"
+  run bash -c 'echo "echo redirected output > '"$OUTPUT_FILE"'" | ./dsh'
+  [ "$status" -eq 0 ]
+  [ -f "$OUTPUT_FILE" ]
+  [[ "$(cat "$OUTPUT_FILE")" == "redirected output" ]]
+ }
 
-# @test "Extra Credit: output redirection" {
-#   OUTPUT_FILE="${TEST_TEMP_DIR}/output.txt"
-#   run bash -c 'echo "echo redirected output > '"$OUTPUT_FILE"'" | ./dsh'
-#   [ "$status" -eq 0 ]
-#   [ -f "$OUTPUT_FILE" ]
-#   [[ "$(cat "$OUTPUT_FILE")" == "redirected output" ]]
-# }
+ @test "Extra Credit: append redirection" {
+   APPEND_FILE="${TEST_TEMP_DIR}/append.txt"
+   echo "first line" > "$APPEND_FILE"
+   run bash -c 'echo "echo second line >> '"$APPEND_FILE"'" | ./dsh'
+   [ "$status" -eq 0 ]
+   [[ "$(cat "$APPEND_FILE")" == *"first line"* ]]
+   [[ "$(cat "$APPEND_FILE")" == *"second line"* ]]
+ }
 
-# @test "Extra Credit: append redirection" {
-#   APPEND_FILE="${TEST_TEMP_DIR}/append.txt"
-#   echo "first line" > "$APPEND_FILE"
-#   run bash -c 'echo "echo second line >> '"$APPEND_FILE"'" | ./dsh'
-#   [ "$status" -eq 0 ]
-#   [[ "$(cat "$APPEND_FILE")" == *"first line"* ]]
-#   [[ "$(cat "$APPEND_FILE")" == *"second line"* ]]
-# }
-
-# @test "Extra Credit: multi-threaded server connections" {
-#   # Start a long-running command on one client
-#   bash -c 'echo "sleep 5" | ./dsh -c -p 8888' &
-#   FIRST_CLIENT_PID=$!
-#   sleep 1
-#   
+@test "Extra Credit: multi-threaded server connections" {
+# Start a long-running command on one client
+   bash -c 'echo "sleep 5" | ./dsh -c -p 8888' &
+   FIRST_CLIENT_PID=$!
+   sleep 1
+   
 #   # Connect with a second client while first is still running
-#   run bash -c 'echo "echo concurrent_connection" | ./dsh -c -p 8888'
-#   
-#   # Wait for first client to finish
-#   wait $FIRST_CLIENT_PID
-#   
+   run bash -c 'echo "echo concurrent_connection" | ./dsh -c -p 8888'
+   
+   # Wait for first client to finish
+   wait $FIRST_CLIENT_PID   
 #   # Check that second client was successful
-#   [ "$status" -eq 0 ]
-#   [[ "$output" == *"concurrent_connection"* ]]
-# }
+   [ "$status" -eq 0 ]
+   [[ "$output" == *"concurrent_connection"* ]]
+ }
