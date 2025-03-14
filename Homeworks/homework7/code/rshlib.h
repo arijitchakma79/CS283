@@ -56,8 +56,7 @@ int process_cli_requests(int svr_socket);
 int exec_client_requests(int cli_socket);
 int rsh_execute_pipeline(int socket_fd, command_list_t *clist);
 
-// For extra credit multithreaded server
-// void set_threaded_server(int val);
-// int exec_client_thread(int main_socket, int cli_socket);
-// void *handle_client(void *arg);
+// Functions for multi-threaded server (extra credit)
+int process_threaded_requests(int svr_socket);
+void *client_thread(void *arg);
 #endif

@@ -8,6 +8,7 @@
 #include <sys/un.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <pthread.h>  // Add pthread support for multi-threading
 
 #include "dshlib.h"
 #include "rshlib.h"
@@ -15,16 +16,26 @@
 // Declaration for dragon function (likely defined in another file)
 extern void print_dragon(void);
 
+// Structure for thread arguments
+typedef struct {
+    int client_socket;
+} thread_args_t;
+
+// Flag to indicate if server should stop
+volatile int server_should_stop = 0;
+pthread_mutex_t server_mutex = PTHREAD_MUTEX_INITIALIZER;
+
 /*
  * start_server(ifaces, port, is_threaded)
- * Main server function
+ * Main server function - now supports multi-threading
  */
 int start_server(char *ifaces, int port, int is_threaded) {
     int svr_socket;
-    int rc;
-
-    // Extra credit: is_threaded parameter handling would go here
-    (void)is_threaded; // Avoid unused parameter warning
+    int rc = OK;
+    
+    // Initialize server mutex
+    pthread_mutex_init(&server_mutex, NULL);
+    server_should_stop = 0;
 
     // Boot up the server
     svr_socket = boot_server(ifaces, port);
@@ -33,11 +44,18 @@ int start_server(char *ifaces, int port, int is_threaded) {
         return err_code;
     }
 
-    // Process client requests
-    rc = process_cli_requests(svr_socket);
+    // Process client requests - different handling based on threading mode
+    if (is_threaded) {
+        rc = process_threaded_requests(svr_socket);
+    } else {
+        rc = process_cli_requests(svr_socket);
+    }
 
     // Stop the server
     stop_server(svr_socket);
+    
+    // Clean up mutex
+    pthread_mutex_destroy(&server_mutex);
 
     return rc;
 }
@@ -146,6 +164,97 @@ int process_cli_requests(int svr_socket) {
     }
 
     return rc;
+}
+
+/*
+ * process_threaded_requests(svr_socket)
+ * Accept and process client connections in separate threads
+ */
+int process_threaded_requests(int svr_socket) {
+    int cli_socket;
+    pthread_t thread_id;
+    struct sockaddr_in client_addr;
+    socklen_t addr_len = sizeof(client_addr);
+    thread_args_t *thread_args;
+    
+    // Set up server for non-blocking accept in case we need to check for shutdown
+    int flags = fcntl(svr_socket, F_GETFL, 0);
+    fcntl(svr_socket, F_SETFL, flags | O_NONBLOCK);
+
+    while(!server_should_stop) {
+        // Accept client connection (non-blocking)
+        cli_socket = accept(svr_socket, (struct sockaddr*)&client_addr, &addr_len);
+        
+        if (cli_socket < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // No connection available, sleep a bit and try again
+                usleep(100000);  // 100ms
+                continue;
+            } else {
+                perror("accept");
+                return ERR_RDSH_COMMUNICATION;
+            }
+        }
+        
+        // Get client address information for logging
+        char client_ip[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, sizeof(client_ip));
+        printf("Client connected from %s:%d\n", client_ip, ntohs(client_addr.sin_port));
+        
+        // Allocate thread arguments (will be freed by the thread)
+        thread_args = (thread_args_t*)malloc(sizeof(thread_args_t));
+        if (!thread_args) {
+            perror("malloc");
+            close(cli_socket);
+            continue;
+        }
+        thread_args->client_socket = cli_socket;
+        
+        // Create a new thread to handle this client
+        if (pthread_create(&thread_id, NULL, client_thread, (void*)thread_args) != 0) {
+            perror("pthread_create");
+            free(thread_args);
+            close(cli_socket);
+            continue;
+        }
+        
+        // Detach thread so it cleans up automatically when done
+        pthread_detach(thread_id);
+    }
+    
+    printf("Multi-threaded server stopping...\n");
+    return OK_EXIT;
+}
+
+/*
+ * client_thread(void *arg)
+ * Thread function to handle a client connection
+ */
+void *client_thread(void *arg) {
+    thread_args_t *thread_args = (thread_args_t*)arg;
+    int cli_socket = thread_args->client_socket;
+    int rc;
+    
+    // Process client requests
+    rc = exec_client_requests(cli_socket);
+    
+    // Check if we should stop the server
+    if (rc == OK_EXIT) {
+        printf("%s", RCMD_MSG_SVR_STOP_REQ);
+        pthread_mutex_lock(&server_mutex);
+        server_should_stop = 1;
+        pthread_mutex_unlock(&server_mutex);
+    } else {
+        printf("%s", RCMD_MSG_CLIENT_EXITED);
+    }
+    
+    // Close client socket
+    close(cli_socket);
+    
+    // Free thread arguments
+    free(thread_args);
+    
+    return NULL;
 }
 
 /*
