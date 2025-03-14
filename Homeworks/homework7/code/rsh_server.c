@@ -8,12 +8,12 @@
 #include <sys/un.h>
 #include <fcntl.h>
 #include <errno.h>
-#include <pthread.h>  // Add pthread support for multi-threading
+#include <pthread.h> 
 
 #include "dshlib.h"
 #include "rshlib.h"
 
-// Declaration for dragon function (likely defined in another file)
+// Declaration for dragon function 
 extern void print_dragon(void);
 
 // Structure for thread arguments
@@ -40,7 +40,7 @@ int start_server(char *ifaces, int port, int is_threaded) {
     // Boot up the server
     svr_socket = boot_server(ifaces, port);
     if (svr_socket < 0) {
-        int err_code = svr_socket;  // Server socket will carry error code
+        int err_code = svr_socket;  
         return err_code;
     }
 
@@ -201,7 +201,7 @@ int process_threaded_requests(int svr_socket) {
         inet_ntop(AF_INET, &client_addr.sin_addr, client_ip, sizeof(client_ip));
         printf("Client connected from %s:%d\n", client_ip, ntohs(client_addr.sin_port));
         
-        // Allocate thread arguments (will be freed by the thread)
+        // Allocate thread arguments 
         thread_args = (thread_args_t*)malloc(sizeof(thread_args_t));
         if (!thread_args) {
             perror("malloc");
@@ -381,7 +381,7 @@ int exec_client_requests(int cli_socket) {
                 free_cmd_list(&cmd_list);
                 continue;
             }
-            // Handle stop-server (without using the enum value that's missing)
+            // Handle stop-server 
             else if (strcmp(cmd_list.commands[0].argv[0], "stop-server") == 0) {
                 send_message_string(cli_socket, "Stopping server...\n");
                 send_message_eof(cli_socket);
@@ -558,7 +558,7 @@ int rsh_execute_pipeline(int cli_sock, command_list_t *clist) {
             // If execvp returns, there was an error
             char error_msg[256];
             
-            // With this code that includes the command name in the error:
+            
             if (errno == ENOENT) {
                 snprintf(error_msg, sizeof(error_msg), "%s: command not found\n", clist->commands[i].argv[0]);
             } else {

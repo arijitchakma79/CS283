@@ -4,7 +4,7 @@
 #include <ctype.h>
 #include <unistd.h>
 #include <sys/wait.h>
-#include <fcntl.h>  // For open(), O_* constants
+#include <fcntl.h>  
 #include "dshlib.h"
 #include <errno.h>
 
