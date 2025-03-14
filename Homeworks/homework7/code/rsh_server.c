@@ -557,7 +557,15 @@ int rsh_execute_pipeline(int cli_sock, command_list_t *clist) {
             
             // If execvp returns, there was an error
             char error_msg[256];
-            snprintf(error_msg, sizeof(error_msg), "Command not found: %s\n", clist->commands[i].argv[0]);
+            
+            // With this code that includes the command name in the error:
+            if (errno == ENOENT) {
+                snprintf(error_msg, sizeof(error_msg), "%s: command not found\n", clist->commands[i].argv[0]);
+            } else {
+                snprintf(error_msg, sizeof(error_msg), "%s: %s\n", clist->commands[i].argv[0], strerror(errno));
+            }
+
+
             write(cli_sock, error_msg, strlen(error_msg));
             exit(EXIT_FAILURE);
         }
