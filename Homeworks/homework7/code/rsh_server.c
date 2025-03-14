@@ -24,6 +24,7 @@ int start_server(char *ifaces, int port, int is_threaded) {
     int rc;
 
     // Extra credit: is_threaded parameter handling would go here
+    (void)is_threaded; // Avoid unused parameter warning
 
     // Boot up the server
     svr_socket = boot_server(ifaces, port);
@@ -223,7 +224,7 @@ int exec_client_requests(int cli_socket) {
         
         // Handle built-in commands for the first command in the pipeline
         if (cmd_list.num == 1) {
-            Built_In_Cmds bi_cmd = rsh_built_in_cmd(&cmd_list.commands[0]);
+            Built_In_Cmds bi_cmd = match_command(cmd_list.commands[0].argv[0]);
             
             if (bi_cmd == BI_CMD_DRAGON) {
                 // Special handling for dragon command
@@ -271,7 +272,8 @@ int exec_client_requests(int cli_socket) {
                 free_cmd_list(&cmd_list);
                 continue;
             }
-            else if (bi_cmd == BI_CMD_STOP_SVR) {
+            // Handle stop-server (without using the enum value that's missing)
+            else if (strcmp(cmd_list.commands[0].argv[0], "stop-server") == 0) {
                 send_message_string(cli_socket, "Stopping server...\n");
                 send_message_eof(cli_socket);
                 free_cmd_list(&cmd_list);
@@ -347,8 +349,9 @@ int rsh_execute_pipeline(int cli_sock, command_list_t *clist) {
 
     // Check for built-in commands first
     if (clist->num == 1) {
-        bi_cmd = rsh_built_in_cmd(&clist->commands[0]);
-        if (bi_cmd == BI_CMD_STOP_SVR) {
+        bi_cmd = match_command(clist->commands[0].argv[0]);
+        // Special handling for stop-server without using enum value
+        if (strcmp(clist->commands[0].argv[0], "stop-server") == 0) {
             return EXIT_SC;  // Signal to stop server
         } else if (bi_cmd == BI_EXECUTED) {
             // Built-in command was executed
@@ -473,46 +476,4 @@ int rsh_execute_pipeline(int cli_sock, command_list_t *clist) {
     }
     
     return exit_code;
-}
-
-/*
- * rsh_match_command(input)
- * Check if a command is a built-in command
- */
-Built_In_Cmds rsh_match_command(const char *input) {
-    if (strcmp(input, "exit") == 0)
-        return BI_CMD_EXIT;
-    if (strcmp(input, "dragon") == 0)
-        return BI_CMD_DRAGON;
-    if (strcmp(input, "cd") == 0)
-        return BI_CMD_CD;
-    if (strcmp(input, "stop-server") == 0)
-        return BI_CMD_STOP_SVR;
-    if (strcmp(input, "rc") == 0)
-        return BI_CMD_RC;
-    return BI_NOT_BI;
-}
-
-/*
- * rsh_built_in_cmd(cmd)
- * Execute a built-in command
- */
-Built_In_Cmds rsh_built_in_cmd(cmd_buff_t *cmd) {
-    Built_In_Cmds ctype = BI_NOT_BI;
-    ctype = rsh_match_command(cmd->argv[0]);
-
-    switch (ctype) {
-    case BI_CMD_EXIT:
-        return BI_CMD_EXIT;
-    case BI_CMD_DRAGON:
-        return BI_CMD_DRAGON;
-    case BI_CMD_STOP_SVR:
-        return BI_CMD_STOP_SVR;
-    case BI_CMD_RC:
-        return BI_CMD_RC;
-    case BI_CMD_CD:
-        return BI_CMD_CD;
-    default:
-        return BI_NOT_BI;
-    }
 }
